@@ -93,6 +93,13 @@ tmp <- trans_norm$new(dataset = w_nov_2025)
 # rarefaction
 w_nov_2025_rarefied <- tmp$norm(method = "rarefy", sample.size = 40000)
 
+w_nov_2025_rarefied$sample_table$Salinity <- factor(
+  w_nov_2025_rarefied$sample_table$Salinity,
+  levels = c("Freshwater", "Moderate Salinity", "High Salinity")
+)
+
+w_nov_2025_rarefied$tidy_dataset()
+
 
 w_nov_2025_rarefied$cal_abund()
 w_nov_2025_rarefied$cal_alphadiv()
@@ -114,6 +121,10 @@ alpha_dat = read_csv("Alpha-dat.csv")
 
 alpha_dat$Salinity <- factor(alpha_dat$Salinity,
                              levels = c("Freshwater", "Moderate Salinity", "High Salinity"))
+
+w_nov_2025_rarefied$sample_table <- factor(w_nov_2025_rarefied$sample_table,
+                         levels = c("Freshwater", "Moderate Salinity", "High Salinity"))
+
 
 alpha_shannon <- ggplot(alpha_dat, 
                                   aes(x = factor(Salinity), 
@@ -199,4 +210,68 @@ top15_palette <- c("#290AD8", "#264DFF",
 Abundance_L <- trans_abund$new(dataset = w_nov_2025_rarefied, taxrank = "Phylum", ntaxa = 15)
 
 
-Abundance_L$plot_box(group = "Location",  xtext_angle = 30)
+box_abundance_loc = Abundance_L$plot_box(group = "Location",  xtext_angle = 30)+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 14), # Increase x-axis text size
+        axis.text.y = element_text(size = 14), # Increase y-axis text size
+        axis.title.x = element_text(size = 14), # Increase x-axis label size
+        axis.title.y = element_text(size = 14), # Increase y-axis label size
+        strip.text = element_text(size = 14),
+        legend.position = "right",
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 14),# Increase facet label size
+        panel.border = element_rect(colour = "black", fill = NA, size = 1)) # Add border
+
+box_abundance_sal = Abundance_L$plot_box(group = "Salinity",  xtext_angle = 30)+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 14), # Increase x-axis text size
+        axis.text.y = element_text(size = 14), # Increase y-axis text size
+        axis.title.x = element_text(size = 14), # Increase x-axis label size
+        axis.title.y = element_text(size = 14), # Increase y-axis label size
+        strip.text = element_text(size = 14),
+        legend.position = "right",
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 14),# Increase facet label size
+        panel.border = element_rect(colour = "black", fill = NA, size = 1)) # Add border
+
+ggsave("Output figures/box_abundance_loc.pdf", plot = box_abundance_loc, device = "pdf", width = 9, 
+       height = 7, units = "in", dpi = 1000)
+
+ggsave("Output figures/box_abundance_sal.pdf", plot = box_abundance_sal, device = "pdf", width = 9, 
+       height = 7, units = "in", dpi = 1000)
+
+stack_loc <- trans_abund$new(dataset = w_nov_2025_rarefied, taxrank = "Phylum", ntaxa = 15, groupmean = "Location")
+
+stack_sal <- trans_abund$new(dataset = w_nov_2025_rarefied, taxrank = "Phylum", ntaxa = 15, groupmean = "Salinity")
+
+stack_loc_plot <- stack_loc$plot_bar(others_color = "grey70", legend_text_italic = FALSE, color_values = top15_palette)  +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 25, hjust = 1, size = 14), # Increase x-axis text size
+        axis.text.y = element_text(size = 14), # Increase y-axis text size
+        axis.title.x = element_text(size = 14), # Increase x-axis label size
+        axis.title.y = element_text(size = 14), # Increase y-axis label size
+        strip.text = element_text(size = 14),
+        legend.position = "right",
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 14),# Increase facet label size
+        panel.border = element_rect(colour = "black", fill = NA, size = 1)) # Add border
+
+
+
+stack_sal_plot <- stack_sal$plot_bar(others_color = "grey70", legend_text_italic = FALSE, color_values = top15_palette)  +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 25, hjust = 1, size = 14), # Increase x-axis text size
+        axis.text.y = element_text(size = 14), # Increase y-axis text size
+        axis.title.x = element_text(size = 14), # Increase x-axis label size
+        axis.title.y = element_text(size = 14), # Increase y-axis label size
+        strip.text = element_text(size = 14),
+        legend.position = "right",
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 14),# Increase facet label size
+        panel.border = element_rect(colour = "black", fill = NA, size = 1)) # Add border
+
+ggsave("Output figures/stack_loc_plot.pdf", plot = stack_loc_plot, device = "pdf", width = 8, 
+       height = 7, units = "in", dpi = 1000)
+
+ggsave("Output figures/stack_sal_plot.pdf", plot = stack_sal_plot, device = "pdf", width = 9, 
+       height = 7, units = "in", dpi = 1000)

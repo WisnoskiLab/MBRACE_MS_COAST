@@ -912,7 +912,51 @@ ggsave("Output figures/conf_mat_plot.pdf", plot = conf_mat_plot , device = "pdf"
 
 rf_loc_1$cal_ROC()
 # select one group to plot ROC
-rf_loc_1$plot_ROC(plot_group = "susceptible")
-rf_loc_1$plot_ROC(plot_group = "susceptible", color_values = "black")
+rf_loc_1$plot_ROC(plot_group = "Biloxi.Bay")
+rf_loc_1$plot_ROC(plot_group = "Biloxi.Bay", color_values = "black")
 # default all groups
 rf_loc_1$plot_ROC(size = 0.5, alpha = 0.7)
+
+
+# require Boruta package
+rf_loc_1$cal_feature_sel(boruta.maxRuns = 300, boruta.pValue = 0.01)
+
+rf_loc_2 <- trans_classifier$new(dataset = w_nov_2025_rarefied, y.response = "Location", x.predictors = "All")
+
+rf_loc_2$cal_split(prop.train = 3/4)
+
+rf_loc_2$cal_feature_sel(boruta.maxRuns = 300, boruta.pValue = 0.01)
+
+rf_loc_2$set_trainControl()
+
+rf_loc_2$cal_train()
+
+rf_loc_2$cal_predict()
+
+rf_loc_2$plot_confusionMatrix()
+
+rf_loc_2$cal_ROC()
+
+rf_loc_2$plot_ROC(size = 0.5, alpha = 0.7)
+
+
+# default method in caret package without significance
+rf_loc_2$cal_feature_imp()
+rf_loc_2$plot_feature_imp(colour = "red", fill = "red", width = 0.6)
+
+# generate significance with rfPermute package
+rf_loc_2$cal_feature_imp(rf_feature_sig = TRUE, num.rep = 1000)
+
+# add_sig = TRUE: add significance label
+rf_loc_2$plot_feature_imp(coord_flip = FALSE, colour = "red", fill = "red", width = 0.6, add_sig = TRUE)
+
+# show_sig_group = TRUE: show different colors in groups with different significance labels
+rf_loc_2$plot_feature_imp(show_sig_group = TRUE, coord_flip = FALSE, width = 0.6, add_sig = TRUE)
+
+rf_loc_2$plot_feature_imp(show_sig_group = TRUE, coord_flip = TRUE, width = 0.6, add_sig = TRUE)
+
+# rf_sig_show = "MeanDecreaseGini": switch to MeanDecreaseGini
+rf_loc_2$plot_feature_imp(show_sig_group = TRUE, rf_sig_show = "MeanDecreaseGini", coord_flip = TRUE, width = 0.6, add_sig = TRUE)
+
+# group_aggre = FALSE: donot aggregate features for each group
+rf_loc_2$plot_feature_imp(show_sig_group = TRUE, rf_sig_show = "MeanDecreaseGini", coord_flip = TRUE, width = 0.6, add_sig = TRUE, group_aggre = FALSE)

@@ -540,3 +540,379 @@ loc_stat_abund = phylum_location$plot
 ggsave("Output figures/loc_stat_abund.pdf", plot = loc_stat_abund, device = "pdf", width = 9, 
        height = 7, units = "in", dpi = 1000)
 
+
+## Differential abundance tests ####
+
+lefse_nov_2025_loc <- trans_diff$new(dataset = w_nov_2025_rarefied, method = "lefse", group = "Location", alpha = 0.01, lefse_subgroup = NULL)
+lefse_nov_2025_sal <- trans_diff$new(dataset = w_nov_2025_rarefied, method = "lefse", group = "Salinity", alpha = 0.05, lefse_subgroup = NULL)
+
+loc_lefse= lefse_nov_2025_loc$plot_diff_bar(threshold = 3.5)
+sal_lefse= lefse_nov_2025_sal$plot_diff_bar(threshold = 3)
+sal_lefse
+
+ggsave("Output figures/loc_lefse.pdf", plot = loc_lefse, device = "pdf", width =8, 
+       height = 10, units = "in", dpi = 1000)
+
+ggsave("Output figures/sal_lefse.pdf", plot = sal_lefse, device = "pdf", width =8, 
+       height = 10, units = "in", dpi = 1000)
+
+# clade_label_level 5 represent phylum level in this analysis
+# require ggtree package
+
+lefse_clado_loc = lefse_nov_2025_loc$plot_diff_cladogram(use_taxa_num = 200, use_feature_num = 50, clade_label_level = 5, group_order = c("Biloxi Bay", "Pascagoula Bay"))
+
+# choose some taxa according to the positions in the previous picture; those taxa labels have minimum overlap
+tmp <- c("c__Gammaproteobacteria", "c__Bacteroidia", "c__Acidimicrobiia", "c__Planctomycetes", "c__Phycisphaerae", 
+         "o__Synechococcales", "o__Burkholderiales", "o__Frankiales", "o__Microtrichales", 
+         "o__Pirellulales", "f__Cyanobiaceae", "f__Comamonadaceae", "f__Sporichthyaceae", "f__Chitinophagaceae",
+         "f__Pirellulaceae", "f__Phycisphaeraceae", "f__Saprospiraceae", "f__Microbacteriaceae", "f__Spirosomataceae")
+# then use parameter select_show_labels to show
+lefse_clado_loc = lefse_nov_2025_loc$plot_diff_cladogram(use_taxa_num = 200, use_feature_num = 50)
+# Now we can see that more taxa names appear in the tree
+
+ggsave("Output figures/lefse_clado_loc.pdf", plot = lefse_clado_loc, device = "pdf", width =18, 
+       height = 10, units = "in", dpi = 1000)
+
+## Random Forest + Differential abundance test
+
+# use Genus level for parameter taxa_level, if you want to use all taxa, change to "all"
+# nresam = 1 and boots = 1 represent no bootstrapping and use all samples directly
+rf_loc <- trans_diff$new(dataset = w_nov_2025_rarefied, method = "rf", group = "Location", taxa_level = "Genus")
+rf_sal <- trans_diff$new(dataset = w_nov_2025_rarefied, method = "rf", group = "Salinity", taxa_level = "Genus")
+
+# plot the MeanDecreaseGini bar
+# group_order is designed to sort the groups
+
+g1 <- rf_loc$plot_diff_bar(use_number = 1:30, group_order = c("Biloxi Bay", "Pascagoula Bay"))
+r1 <- rf_sal$plot_diff_bar(use_number = 1:30, group_order = c("Freshwater", "Moderate Salinity", "High Salinity"))
+
+# plot the abundance using same taxa in g1
+g2 <- rf_loc$plot_diff_abund(group_order = c("Biloxi Bay", "Pascagoula Bay"), select_taxa = rf_loc$plot_diff_bar_taxa, plot_type = "barerrorbar", add_sig = F, errorbar_addpoint = FALSE, errorbar_color_black = TRUE)
+r2 <- rf_sal$plot_diff_abund(group_order = c("Freshwater", "Moderate Salinity", "High Salinity"), select_taxa = rf_sal$plot_diff_bar_taxa, plot_type = "barerrorbar", add_sig = F, errorbar_addpoint = FALSE, errorbar_color_black = TRUE)
+
+# now the y axis in g1 and g2 is same, so we can merge them
+# remove g1 legend; remove g2 y axis text and ticks
+g1 <- g1 + theme(legend.position = "none")
+g2 <- g2 + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), panel.border = element_blank())
+p <- g1 %>% aplot::insert_right(g2)
+p
+
+r1 <- r1 + theme(legend.position = "none")
+r2 <- r2 + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), panel.border = element_blank())
+q <- r1 %>% aplot::insert_right(r2)
+q
+
+ggsave("Output figures/rf_loc.pdf", plot = p, device = "pdf", width =9, 
+       height = 10, units = "in", dpi = 1000)
+
+
+ggsave("Output figures/rf_sal.pdf", plot = q, device = "pdf", width =9, 
+       height = 10, units = "in", dpi = 1000)
+
+############ Null Model analysis #########################
+###------ beta NTI -------#######
+
+# generate trans_nullmodel object
+# as an example, we only use high abundance OTU with mean relative abundance > 0.0005
+# Set salinity order BEFORE trans_beta$new()
+w_nov_2025_rarefied$sample_table$Salinity <- factor(
+  w_nov_2025_rarefied$sample_table$Salinity,
+  levels = c("Freshwater", "Moderate Salinity", "High Salinity")
+)
+
+unique(w_nov_2025_rarefied$sample_table$Salinity)
+
+nm<- trans_nullmodel$new(w_nov_2025_rarefied, filter_thres = 0.0005)
+
+# see null.model parameter for other null models
+# null model run 500 times for the example
+nm$cal_ses_betampd(runs = 500, abundance.weighted = TRUE)
+# return t1$res_ses_betampd
+
+# add betaNRI matrix to beta_diversity list
+w_nov_2025_rarefied$beta_diversity[["betaNRI"]] <- nm$res_ses_betampd
+
+# create trans_beta class, use measure "betaNRI"
+nm_beta_loc <- trans_beta$new(dataset = w_nov_2025_rarefied, group = "Location", measure = "betaNRI")
+nm_beta_sal <- trans_beta$new(dataset = w_nov_2025_rarefied, group = "Salinity", measure = "betaNRI")
+
+# transform the distance for each group
+nm_beta_loc$cal_group_distance()
+nm_beta_sal$cal_group_distance()
+
+# see the help document for more methods, e.g. "anova" and "KW_dunn"
+nm_beta_loc$cal_group_distance_diff(method = "wilcox")
+
+nm_beta_sal$cal_group_distance_diff(method = "wilcox")
+
+# Make sure salinity group is ordered correctly
+nm_beta_sal$sample_table$Salinity <- factor(
+  nm_beta_sal$sample_table$Salinity,
+  levels = c("Freshwater", "Moderate Salinity", "High Salinity")
+)
+
+# plot the results
+g1 <- nm_beta_loc$plot_group_distance(add = "mean")
+g1 + geom_hline(yintercept = -2, linetype = 2) + geom_hline(yintercept = 2, linetype = 2)
+
+q1 <- nm_beta_sal$plot_group_distance(group = "Salinity", add = "mean") + geom_hline(yintercept = -2, linetype = 2) + geom_hline(yintercept = 2, linetype = 2)
+q1 
+
+# Extract result table
+df <- nm_beta_sal$res_group_distance
+
+df$Salinity <- factor(
+  df$Salinity,
+  levels = c("Freshwater", "Moderate Salinity", "High Salinity")
+)
+
+beta_NRI_sal <- ggplot(df, aes(x = Salinity, y = Value, fill = Salinity)) +
+  geom_boxplot(outlier.shape = NA, width = 0.6) +
+  geom_jitter(width = 0.15, size = 2, alpha = 0.6) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4) +
+  geom_hline(yintercept = -2, linetype = 2) +
+  geom_hline(yintercept = 2, linetype = 2) +
+  labs(x = "Salinity", y = "betaNRI") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 14),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14),
+    axis.text.y = element_text(color = "black", size = 14),
+    axis.title = element_text(color = "black", size = 14)
+  )
+
+q1
+
+ggsave("Output figures/betaNRI_sal.pdf", plot = beta_NRI_sal , device = "pdf", width =7, 
+       height = 7, units = "in", dpi = 1000)
+
+###------ beta NRI -------#######
+
+# null model run 500 times
+nm$cal_ses_betamntd(runs = 500, abundance.weighted = TRUE, null.model = "taxa.labels")
+# return t1$res_ses_betamntd
+
+# add betaNRI matrix to beta_diversity list
+w_nov_2025_rarefied$beta_diversity[["betaNTI"]] <- nm$res_ses_betamntd
+
+nm_NTI_sal <- trans_beta$new(dataset = w_nov_2025_rarefied, group = "Salinity", measure = "betaNTI")
+nm_NTI_loc <- trans_beta$new(dataset = w_nov_2025_rarefied, group = "Location", measure = "betaNTI")
+
+nm_NTI_sal$cal_group_distance()
+nm_NTI_loc$cal_group_distance()
+
+nm_NTI_sal$cal_group_distance_diff(method = "wilcox")
+nm_NTI_loc$cal_group_distance_diff(method = "wilcox")
+
+# Extract result table
+df_nti <- nm_NTI_sal$res_group_distance
+df_nti_loc<- nm_NTI_loc$res_group_distance
+
+df_nti$Salinity <- factor(
+  df_nti$Salinity,
+  levels = c("Freshwater", "Moderate Salinity", "High Salinity")
+)
+
+beta_NTI_sal <- ggplot(df_nti, aes(x = Salinity, y = Value, fill = Salinity)) +
+  geom_boxplot(outlier.shape = NA, width = 0.6) +
+  geom_jitter(width = 0.15, size = 2, alpha = 0.6) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4) +
+  geom_hline(yintercept = -2, linetype = 2) +
+  geom_hline(yintercept = 2, linetype = 2) +
+  labs(x = "Salinity", y = "betaNTI") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 14),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14),
+    axis.text.y = element_text(color = "black", size = 14),
+    axis.title = element_text(color = "black", size = 14)
+  )
+
+beta_NTI_loc <- ggplot(df_nti_loc, aes(x = Location, y = Value, fill = Location)) +
+  geom_boxplot(outlier.shape = NA, width = 0.6) +
+  geom_jitter(width = 0.15, size = 2, alpha = 0.6) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4) +
+  geom_hline(yintercept = -2, linetype = 2) +
+  geom_hline(yintercept = 2, linetype = 2) +
+  labs(x = "Location", y = "betaNTI") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1, size = 14),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14),
+    axis.text.y = element_text(color = "black", size = 14),
+    axis.title = element_text(color = "black", size = 14)
+  )
+
+beta_NTI_sal
+beta_NTI_loc
+
+ggsave("Output figures/beta_NTI_sal.pdf", plot = beta_NTI_sal , device = "pdf", width =7, 
+       height = 7, units = "in", dpi = 1000)
+
+ggsave("Output figures/beta_NTI_loc.pdf", plot = beta_NTI_loc , device = "pdf", width =7, 
+       height = 7, units = "in", dpi = 1000)
+
+## RC Bray
+
+# result stored in t1$res_rcbray
+nm$cal_rcbray(runs = 1000)
+# return t1$res_rcbray
+
+# use betaNTI and rcbray to evaluate processes
+rcbray_loc = nm$cal_process(use_betamntd = TRUE, group = "Location")
+rcbray_sal = nm$cal_process(use_betamntd = TRUE, group = "Salinity")
+
+rcbray_loc$res_process
+rcbray_sal$res_process
+
+
+df_loc_rcbray <- rcbray_loc$res_process
+df_sal_rcbray <- rcbray_sal$res_process
+# order processes
+df_loc_rcbray$process <- factor(
+  df_loc_rcbray$process,
+  levels = c(
+    "variable selection",
+    "homogeneous selection",
+    "dispersal limitation",
+    "homogeneous dispersal",
+    "drift"
+  )
+)
+
+# order salinity groups
+df_sal_rcbray$Salinity <- factor(
+  df_sal_rcbray$Salinity,
+  levels = c("Freshwater", "Moderate Salinity", "High Salinity")
+)
+
+# order locations if needed
+
+p_loc <- ggplot(df_loc_rcbray, aes(x = Location, y = percentage, fill = process)) +
+  geom_bar(stat = "identity", width = 0.7, color = "black", linewidth = 0.4) +
+  geom_text(
+    aes(label = ifelse(percentage > 3, paste0(round(percentage, 1), "%"), "")),
+    position = position_stack(vjust = 0.5),
+    size = 4,
+    color = "black"
+  ) +
+  scale_fill_manual(values = c(
+    "variable selection" = "#D55E00",
+    "homogeneous selection" = "#0072B2",
+    "dispersal limitation" = "#009E73",
+    "homogeneous dispersal" = "#CC79A7",
+    "drift" = "#F0E442"
+  )) +
+  labs(
+    x = "Location",
+    y = "Percentage (%)",
+    fill = "Process"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 25, hjust = 1, size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 14, color = "black"),
+    axis.title.y = element_text(size = 14, color = "black"),
+    strip.text = element_text(size = 14, color = "black"),
+    legend.position = "right",
+    legend.title = element_text(size = 14, color = "black"),
+    legend.text = element_text(size = 14, color = "black"),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_sal <- ggplot(df_sal_rcbray, aes(x = Salinity, y = percentage, fill = process)) +
+  geom_bar(stat = "identity", width = 0.7, color = "black", linewidth = 0.4) +
+  geom_text(
+    aes(label = ifelse(percentage > 3, paste0(round(percentage, 1), "%"), "")),
+    position = position_stack(vjust = 0.5),
+    size = 4,
+    color = "black"
+  ) +
+  scale_fill_manual(values = c(
+    "variable selection" = "#D55E00",
+    "homogeneous selection" = "#0072B2",
+    "dispersal limitation" = "#009E73",
+    "homogeneous dispersal" = "#CC79A7",
+    "drift" = "#F0E442"
+  )) +
+  labs(
+    x = "Salinity",
+    y = "Percentage (%)",
+    fill = "Process"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 25, hjust = 1, size = 14, color = "black"),
+    axis.text.y = element_text(size = 14, color = "black"),
+    axis.title.x = element_text(size = 14, color = "black"),
+    axis.title.y = element_text(size = 14, color = "black"),
+    strip.text = element_text(size = 14, color = "black"),
+    legend.position = "right",
+    legend.title = element_text(size = 14, color = "black"),
+    legend.text = element_text(size = 14, color = "black"),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_loc
+p_sal
+
+ggsave("Output figures/rcbray_sal.pdf", plot = p_sal , device = "pdf", width =7, 
+       height = 8, units = "in", dpi = 1000)
+
+ggsave("Output figures/rcbray_loc.pdf", plot = p_loc , device = "pdf", width =7, 
+       height = 8, units = "in", dpi = 1000)
+
+## NST
+
+# require NST package to be installed
+nst_loc = nm$cal_NST(method = "tNST", group = "Location", dist.method = "bray", abundance.weighted = TRUE, output.rand = TRUE, SES = TRUE)
+nst_sal = nm$cal_NST(method = "tNST", group = "Salinity", dist.method = "bray", abundance.weighted = TRUE, output.rand = TRUE, SES = TRUE)
+
+nst_loc$res_NST$index.grp
+nst_sal$res_NST$index.grp
+
+###### Classifier based analysis ############
+
+packages <- c("Boruta", "parallel", "rsample", "randomForest", "caret", "gridExtra", "multiROC", "rfPermute")
+# Now check or install
+for(x in packages){
+  if(!require(x, character.only = TRUE)) {
+    install.packages(x, dependencies = TRUE)
+  }
+}
+library(devtools)
+
+remotes::install_github("WandeRum/multiROC")
+
+install.packages('multiROC')
+
+rf_loc_1 <- trans_classifier$new(dataset = w_nov_2025_rarefied, y.response = "Location", x.predictors = "All")
+
+# generate train and test set
+rf_loc_1$cal_split(prop.train = 3/4)
+
+# require caret package
+rf_loc_1$set_trainControl()
+
+# use default parameter method = "rf"
+rf_loc_1$cal_train(method = "rf")
+
+rf_loc_1$cal_predict()
+# plot the confusionMatrix to check out the performance
+conf_mat_plot = rf_loc_1$plot_confusionMatrix()
+
+ggsave("Output figures/conf_mat_plot.pdf", plot = conf_mat_plot , device = "pdf", width =7, 
+       height = 6, units = "in", dpi = 1000)
+
+rf_loc_1$cal_ROC()
+# select one group to plot ROC
+rf_loc_1$plot_ROC(plot_group = "susceptible")
+rf_loc_1$plot_ROC(plot_group = "susceptible", color_values = "black")
+# default all groups
+rf_loc_1$plot_ROC(size = 0.5, alpha = 0.7)
